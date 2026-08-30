@@ -1,0 +1,88 @@
+api:
+  host: "0.0.0.0"
+  port: 8082
+
+router:
+  default_model: "local-general"
+  strategy: "intelligent"
+
+  tier_cost_limits:
+    free: 0.0005
+    premium: 0.01
+    enterprise: 0.1
+
+  models:
+    local-general:
+      provider: "local"
+      provider_model: "local-echo-v1"
+      max_tokens: 1024
+      cost_per_1k_input: 0.0001
+      cost_per_1k_output: 0.0002
+      priority: 1
+      capabilities: [general, chat]
+      supported_tiers: [free, premium, enterprise]
+      fallback_model: null
+      api_key_env: null
+      avg_latency_ms: 40
+      success_rate: 0.99
+
+    local-coding:
+      provider: "local"
+      provider_model: "local-coder-v1"
+      max_tokens: 2048
+      cost_per_1k_input: 0.0002
+      cost_per_1k_output: 0.0004
+      priority: 2
+      capabilities: [coding, debugging, general]
+      supported_tiers: [free, premium, enterprise]
+      fallback_model: "local-general"
+      api_key_env: null
+      avg_latency_ms: 60
+      success_rate: 0.98
+
+    gpt-4o-mini:
+      provider: "openai"
+      provider_model: "gpt-4o-mini"
+      max_tokens: 16384
+      cost_per_1k_input: 0.00015
+      cost_per_1k_output: 0.0006
+      priority: 3
+      capabilities: [general, chat, analysis, coding]
+      supported_tiers: [premium, enterprise]
+      fallback_model: "local-general"
+      api_key_env: "OPENAI_API_KEY"
+      avg_latency_ms: 800
+      success_rate: 0.97
+
+    claude-sonnet:
+      provider: "anthropic"
+      provider_model: "claude-sonnet-5"
+      max_tokens: 64000
+      cost_per_1k_input: 0.003
+      cost_per_1k_output: 0.015
+      priority: 4
+      capabilities: [general, chat, analysis, reasoning, coding, long_context]
+      supported_tiers: [premium, enterprise]
+      fallback_model: "gpt-4o-mini"
+      api_key_env: "ANTHROPIC_API_KEY"
+      avg_latency_ms: 1200
+      success_rate: 0.98
+
+  routing_rules:
+    - name: "coding_rule"
+      condition: "query_type == 'coding'"
+      candidates: [local-coding, claude-sonnet]
+      fallback: "local-general"
+      reason: "Coding query routed to code-capable models"
+
+    - name: "long_analysis_rule"
+      condition: "query_type == 'analysis' and token_count > 80"
+      candidates: [claude-sonnet, gpt-4o-mini]
+      fallback: "local-general"
+      reason: "Long analysis query routed to high-context models"
+
+    - name: "premium_rule"
+      condition: "user_tier in ['premium', 'enterprise']"
+      candidates: [claude-sonnet, gpt-4o-mini, local-coding, local-general]
+      fallback: "local-general"
+      reason: "Premium-tier user allowed into high-priority provider pool"
