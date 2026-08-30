@@ -4,6 +4,7 @@ import uuid
 
 import uvicorn
 from fastapi import FastAPI
+from fastapi.responses import HTMLResponse
 
 from config_loader import load_config
 from inference import AllModelsFailedError, InferenceEngine
@@ -30,6 +31,25 @@ _router = QueryRouter(_config.router)
 _engine = InferenceEngine(_config.router)
 _metrics = MetricsStore()
 _metrics.log("info", "service started")
+
+
+@app.get("/", response_class=HTMLResponse, include_in_schema=False)
+def index() -> str:
+    return """<!doctype html><html><head><meta charset="utf-8">
+<title>LLM Router</title>
+<style>body{font-family:system-ui,sans-serif;max-width:640px;margin:60px auto;padding:0 20px;line-height:1.7;color:#222}
+a{color:#0b6e6d}li{margin:6px 0}</style></head><body>
+<h1>LLM Router</h1>
+<p>This service picks the best AI model for each question (by cost, capability
+and user tier) and falls back automatically when a model is unavailable.</p>
+<ul>
+<li><a href="/docs">Try the API</a> (interactive docs; use POST /route)</li>
+<li><a href="/health">Health</a> &middot; <a href="/analytics">Analytics</a> &middot; <a href="/status">Status</a></li>
+<li>Source: <a href="https://github.com/xiyiji/llm-router-platform">github.com/xiyiji/llm-router-platform</a></li>
+</ul>
+<p>Sister project: <b>Delivery Exception Handler</b>, an AI service for failed
+package deliveries: <a href="https://github.com/xiyiji/llm-project">github.com/xiyiji/llm-project</a></p>
+</body></html>"""
 
 
 @app.get("/health", response_model=HealthResponse)

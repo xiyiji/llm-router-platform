@@ -245,3 +245,9 @@ def test_deepseek_adapter_listed(no_external_keys):
     providers = client.get("/health").json()["services"]["inference"]["details"]["providers"]
     assert "deepseek" in providers
     assert providers["deepseek"]["healthy"] is False
+
+
+def test_root_landing_page():
+    response = client.get("/")
+    assert response.status_code == 200
+    assert "LLM Router" in response.text
