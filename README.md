@@ -1,21 +1,23 @@
 # LLM Router & Execution Platform
 
-A three-phase course project building an LLM routing and execution platform.
+Course project, built in three phases. Each phase folder is a standalone app
+with its own venv, config and tests.
 
-| Phase | Directory | Status | Focus |
-|-------|-----------|--------|-------|
-| 1 | [`One/`](One/) | ✅ Done | Minimal `API -> Router -> Inference` pipeline (FastAPI, mock provider, port 8081) |
-| 2 | [`Two/`](Two/) | ✅ Done | Intelligent routing, multi-provider abstraction, fallback/degradation (port 8082) |
-| 3 | [`Three/`](Three/) | ✅ Done | Observability endpoints (`/status`, `/analytics`, `/quality/dashboard`, `/feedback`, `/logs`) + Streamlit dashboard (API :8080, UI :8501) |
+- `One/` - phase 1, minimal FastAPI service that routes a query to a mock model (port 8081)
+- `Two/` - phase 2, smarter routing with multiple providers and fallback (port 8082)
+- `Three/` - phase 3, adds analytics endpoints and a Streamlit dashboard (API on 8080, UI on 8501)
 
-Specs (in Chinese) live in [`project2/project2/`](project2/project2/) — `Phase 1.md` through `Phase 3.md`.
+The original specs are under `project2/project2/` (Phase 1.md to Phase 3.md, in Chinese).
 
-Each phase directory is self-contained with its own `requirements.txt`, `config.yaml`, and tests:
+To run a phase:
 
 ```bash
-cd One
+cd Three
 python3 -m venv venv
-./venv/bin/python -m pip install -r requirements.txt
-./venv/bin/python -m pytest -q
+./venv/bin/pip install -r requirements.txt
 ./venv/bin/python main.py
 ```
+
+Tests: `./venv/bin/python -m pytest -q`
+
+See DEPLOY.md for putting phase 3 online.

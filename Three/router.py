@@ -70,7 +70,7 @@ def evaluate_rule(condition: str, context: Dict[str, object]) -> Optional[bool]:
     """Safely evaluate a rule condition against the routing context.
 
     Returns True/False, or None when the expression is invalid or uses
-    disallowed syntax — the caller skips such rules instead of crashing.
+    disallowed syntax, so the caller skips such rules instead of crashing.
     """
     try:
         tree = ast.parse(condition, mode="eval")

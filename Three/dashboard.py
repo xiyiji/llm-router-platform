@@ -1,9 +1,6 @@
-"""Streamlit dashboard for LLM Router Phase 3.
+"""Streamlit dashboard for the phase 3 router.
 
-Every page reads live data from the FastAPI backend. When the backend is
-unreachable the page says so explicitly — it never shows made-up numbers.
-
-Run:  ./venv/bin/python -m streamlit run dashboard.py
+Run: ./venv/bin/python -m streamlit run dashboard.py
 """
 
 import datetime
@@ -31,7 +28,7 @@ def require(*payloads) -> None:
     """Stop the page with a clear error when the backend is unreachable."""
     if any(p is None for p in payloads):
         st.error(
-            f"Data unavailable — backend unreachable at {API}. "
+            f"Data unavailable: backend unreachable at {API}. "
             "Start it with `./venv/bin/python main.py` and refresh."
         )
         st.stop()
@@ -53,7 +50,7 @@ page = st.sidebar.radio(
 status = fetch("/status")
 if status:
     st.sidebar.success(
-        f"Backend running — {status['router_mode']} mode, "
+        f"Backend running, {status['router_mode']} mode, "
         f"{status['model_count']} models, up {status['uptime_seconds']}s"
     )
     adapters = status.get("adapters", {})
@@ -79,7 +76,7 @@ if page == "Overview":
     c[3].metric("Total cost", f"${analytics['total_cost_usd']:.6f}")
     c[4].metric("Cache hit rate", pct(analytics["cache_hit_rate"]))
     st.caption(f"Overall health: {health['status']}")
-    st.subheader("Requests — last 30 minutes")
+    st.subheader("Requests, last 30 minutes")
     series = analytics["requests_per_minute"]
     if series:
         df = pd.DataFrame(series).set_index("minutes_ago").sort_index(ascending=False)
@@ -111,7 +108,7 @@ elif page == "Performance":
     c[1].metric("Avg latency", ms(quality["avg_latency_ms"]))
     c[2].metric("P95 latency", ms(quality["p95_latency_ms"]))
     c[3].metric("Error rate", pct(quality["error_rate"]))
-    st.subheader("Request volume — last 30 minutes")
+    st.subheader("Request volume, last 30 minutes")
     series = analytics["requests_per_minute"]
     if series:
         df = pd.DataFrame(series).set_index("minutes_ago").sort_index(ascending=False)
@@ -164,11 +161,11 @@ elif page == "Alerts":
         st.info("SLO status: no traffic yet.")
     elif compliant:
         st.success(
-            f"SLO compliant — error rate ≤ {slo['error_rate_target']:.0%}, "
-            f"P95 ≤ {slo['p95_latency_target_ms']} ms"
+            f"SLO compliant: error rate <= {slo['error_rate_target']:.0%}, "
+            f"P95 <= {slo['p95_latency_target_ms']} ms"
         )
     else:
-        st.error("SLO violated — see alerts below.")
+        st.error("SLO violated, see alerts below.")
     for alert in quality["alerts"]:
         (st.error if alert["severity"] == "critical" else st.warning)(alert["message"])
     if not quality["alerts"]:
@@ -209,6 +206,6 @@ elif page == "Logs":
                     timeout=3,
                 )
                 resp.raise_for_status()
-                st.success(f"Feedback stored — total {resp.json()['feedback_count']}")
+                st.success(f"Feedback stored, total {resp.json()['feedback_count']}")
             except requests.RequestException:
-                st.error(f"Could not submit — backend unreachable at {API}.")
+                st.error(f"Could not submit: backend unreachable at {API}.")

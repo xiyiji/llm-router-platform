@@ -1,4 +1,4 @@
-"""LLM Router Phase 3 — routing API plus observability endpoints."""
+"""FastAPI app for the phase 3 router, plus the monitoring endpoints."""
 
 import uuid
 

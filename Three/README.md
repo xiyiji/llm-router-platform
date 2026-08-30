@@ -1,41 +1,38 @@
-# LLM Router — Phase 3
+# Phase 3
 
-Backend observability endpoints + Streamlit dashboard on live data.
+Adds monitoring on top of the phase 2 router: the backend records every
+`/route` call and exposes aggregate endpoints, and a Streamlit dashboard
+shows them.
 
 ## Run
 
 ```bash
 python3 -m venv venv
-./venv/bin/python -m pip install -r requirements.txt
+./venv/bin/pip install -r requirements.txt
 
-# terminal 1 — backend API on :8080
+# terminal 1, backend on :8080
 ./venv/bin/python main.py
 
-# terminal 2 — dashboard on :8501
+# terminal 2, dashboard on :8501
 ./venv/bin/python -m streamlit run dashboard.py
 ```
 
 ## Endpoints
 
-| Endpoint | Serves |
-|---|---|
-| `POST /route` | routing + inference (records metrics) |
-| `GET /health` | service + provider health |
-| `GET /status` | system snapshot: mode, uptime, adapters, SLO config |
-| `GET /analytics` | totals, by-model / by-tier / by-type aggregates, per-minute series |
-| `GET /quality/dashboard` | success rate, error rate, avg/P95 latency, hotspots, SLO, alerts |
-| `POST /feedback` | store user feedback |
-| `GET /logs` | recent request/system logs |
+- `POST /route` - same as phase 2, now also records metrics
+- `GET /health` - service and provider health
+- `GET /status` - mode, uptime, adapters, SLO config
+- `GET /analytics` - totals plus per-model / per-tier / per-type breakdowns
+- `GET /quality/dashboard` - success rate, error rate, avg/P95 latency, hotspots, alerts
+- `POST /feedback` - stores a rating for a query
+- `GET /logs` - recent log lines
 
-## Dashboard pages
+## Dashboard
 
-Overview · Models · Performance · Users · Costs · Alerts · Logs (+ feedback form).
-All pages read the backend endpoints above; when the backend is down they show
-"backend unreachable" — never fabricated numbers. Call `POST /route` a few times
-and refresh to watch every page change.
+Seven pages: Overview, Models, Performance, Users, Costs, Alerts, Logs
+(plus a feedback form on the Logs page). All numbers come from the endpoints
+above. If the backend is down the pages say so instead of showing anything.
 
-## Tests
+To see it move: fire a few `POST /route` calls and refresh.
 
-```bash
-./venv/bin/python -m pytest -q
-```
+Tests: `./venv/bin/python -m pytest -q`

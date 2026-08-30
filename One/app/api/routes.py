@@ -1,4 +1,4 @@
-"""HTTP endpoints: request/response orchestration only."""
+"""/health and /route endpoints."""
 
 import uuid
 

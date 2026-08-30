@@ -1,4 +1,4 @@
-"""LLM Router Phase 2 — FastAPI application and entry point."""
+"""FastAPI app for the phase 2 router."""
 
 import uuid
 

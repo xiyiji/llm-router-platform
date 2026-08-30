@@ -1,10 +1,4 @@
-"""Multi-provider inference with fallback for Phase 2.
-
-Providers do not call real external APIs in this phase — the structure and
-the fallback flow are the deliverable. Each provider keeps a single seam
-(`_generate_text`) where a real API call can be plugged in later without
-touching the API or routing layers.
-"""
+"""Providers and the inference engine. Provider failures trigger fallback."""
 
 import os
 import time
@@ -39,7 +33,7 @@ class BaseProvider(ABC):
 
     @abstractmethod
     def _generate_text(self, request: QueryRequest, model_name: str, config: ModelConfig) -> str:
-        """Produce the response text. Replace with a real API call later."""
+        """Produce the response text."""
 
 
 class LocalProvider(BaseProvider):
@@ -53,7 +47,7 @@ class LocalProvider(BaseProvider):
 
 
 class _ExternalKeyedProvider(BaseProvider):
-    """External provider gated on an API key env var; simulated call for now."""
+    """External provider, needs an API key env var. Calls are stubbed for now."""
 
     key_env: str
 
@@ -63,7 +57,7 @@ class _ExternalKeyedProvider(BaseProvider):
         return True, None
 
     def _generate_text(self, request: QueryRequest, model_name: str, config: ModelConfig) -> str:
-        # Extension point: replace with a real SDK call to this provider.
+        # TODO: real API call goes here
         return (
             f"[simulated {self.name}:{config.provider_model}] "
             f"response to: {request.query[:150]}"

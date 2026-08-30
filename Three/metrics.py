@@ -134,7 +134,7 @@ class MetricsStore:
         if total and fallback / total > 0.5:
             alerts.append({
                 "severity": "warning",
-                "message": f"Fallback used on {fallback}/{total} requests — check provider API keys",
+                "message": f"Fallback used on {fallback}/{total} requests, check provider API keys",
             })
 
         return {

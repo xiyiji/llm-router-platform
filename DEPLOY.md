@@ -1,24 +1,20 @@
 # Deploy
 
-## 1. Backend API — Render (free)
+## Backend (Render)
 
-1. Sign in at <https://dashboard.render.com> with GitHub.
-2. **New → Blueprint** → select `xiyiji/llm-router-platform` → Apply.
-   (`render.yaml` builds `Three/` and starts `uvicorn main:app`.)
-3. Copy the service URL, e.g. `https://llm-router-api.onrender.com`.
-   Verify: `https://<url>/health` and `https://<url>/docs`.
+1. Log into dashboard.render.com with GitHub
+2. New -> Blueprint -> pick this repo -> Apply. render.yaml builds `Three/`
+   and starts uvicorn.
+3. Check `https://<service>.onrender.com/docs` once it's up.
 
-## 2. Dashboard — Streamlit Community Cloud (free)
+## Dashboard (Streamlit Community Cloud)
 
-1. Sign in at <https://share.streamlit.io> with GitHub.
-2. **Create app** → repo `xiyiji/llm-router-platform` → branch `main` →
-   main file `Three/dashboard.py`.
-3. **Advanced settings → Secrets/Environment**: set
-   `ROUTER_API = https://<your-render-url>` (no trailing slash).
-4. Deploy. The dashboard URL is public and shareable.
+1. Log into share.streamlit.io with GitHub
+2. Create app -> this repo, branch main, main file `Three/dashboard.py`
+3. In advanced settings add `ROUTER_API=https://<your-render-url>`
+   (no trailing slash)
+4. Deploy
 
-## Notes
-
-- Free tiers sleep when idle; first request takes ~30s to wake.
-- Every `git push` to `main` redeploys both services automatically.
-- No secrets required: external providers are key-gated simulations.
+Notes: free tiers sleep when idle, so the first request after a while takes
+about 30s. Pushing to main redeploys both. No API keys are needed since the
+external providers are stubbed.

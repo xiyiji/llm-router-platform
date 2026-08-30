@@ -1,31 +1,31 @@
-# Phase 3 Guide
+# Phase 3 notes
 
 ## Data flow
 
-`POST /route` records every request into `metrics.py::MetricsStore` (in-memory,
-thread-safe): model, provider, tier, query type, tokens, cost, latency, success,
-fallback. The observability endpoints aggregate that store on demand:
+Every POST /route stores one record in MetricsStore (metrics.py, in-memory,
+behind a lock): model, provider, tier, query type, tokens, cost, latency,
+success, fallback. The read endpoints aggregate on demand:
 
-- `/analytics` — totals plus by-model, by-tier, by-query-type breakdowns and a
-  30-minute per-minute request series.
-- `/quality/dashboard` — success/error rate, avg and P95 latency, hotspot
-  models, SLO compliance (error rate ≤ 5%, P95 ≤ 2000 ms), and derived alerts
-  (SLO breaches, high fallback ratio).
-- `/status` — service snapshot: router mode, uptime, provider adapters, SLO config.
-- `/feedback` — stores ratings; count surfaces in `/quality/dashboard`.
-- `/logs` — ring buffer of request and system log lines.
+- /analytics: totals, per-model / per-tier / per-type breakdowns, and a
+  30-minute request series
+- /quality/dashboard: success and error rate, avg and P95 latency, hotspot
+  models, SLO check (error rate <= 5%, P95 <= 2000ms) and derived alerts
+- /status: router mode, uptime, provider adapters, SLO config
+- /feedback: stores ratings, the count shows up in /quality/dashboard
+- /logs: ring buffer with the last ~300 log lines
 
-## Frontend
+Everything resets on restart since it's in memory. Good enough for this
+phase; a real deployment would persist to a database.
 
-`dashboard.py` is a Streamlit app with seven pages, each backed by the real
-endpoints (page → endpoint mapping follows the spec). The `require()` helper
-stops any page with an explicit "backend unreachable" error when a fetch fails,
-so the dashboard never renders fabricated data.
+## Dashboard
 
-## Verifying the loop
+dashboard.py, one file, page picked with a sidebar radio. Each page fetches
+from the endpoints above with a 3s timeout. If a fetch fails the page shows
+"backend unreachable" and stops, so there's never made-up data on screen.
 
-1. Start the backend, open the dashboard — Overview shows zeros.
-2. Fire several `POST /route` calls (mixed tiers/queries).
-3. Refresh Overview / Models / Performance — request counts, latency, costs,
-   hotspots, and tier distribution all change.
-4. Stop the backend, refresh — every page reports "backend unreachable".
+## Checking the loop works
+
+1. Start the backend, open the dashboard: everything is at zero.
+2. Send some /route calls with different tiers and query types.
+3. Refresh: Overview, Models, Performance, Users and Costs all change.
+4. Stop the backend and refresh: every page reports it can't reach the API.
