@@ -1,9 +1,19 @@
-"""Providers and the inference engine. Provider failures trigger fallback."""
+"""Providers and the inference engine. Provider failures trigger fallback.
+
+External providers make real API calls when their key env var is set
+(OpenAI-compatible chat completions for openai/deepseek, the messages API for
+anthropic). Successful non-fallback results go through an LRU+TTL response
+cache; the `cached` flag in responses is real.
+"""
 
 import os
+import threading
 import time
 from abc import ABC, abstractmethod
+from collections import OrderedDict
 from typing import Dict, List, Optional, Tuple
+
+import httpx
 
 from schema import (
     InferenceResult,
@@ -12,6 +22,9 @@ from schema import (
     RouterConfig,
     RoutingDecision,
 )
+
+CACHE_MAX_ENTRIES = 256
+CACHE_TTL_SECONDS = 600
 
 
 class ProviderUnavailableError(Exception):
@@ -47,7 +60,7 @@ class LocalProvider(BaseProvider):
 
 
 class _ExternalKeyedProvider(BaseProvider):
-    """External provider, needs an API key env var. Calls are stubbed for now."""
+    """External provider gated on an API key env var."""
 
     key_env: str
 
@@ -57,21 +70,108 @@ class _ExternalKeyedProvider(BaseProvider):
         return True, None
 
     def _generate_text(self, request: QueryRequest, model_name: str, config: ModelConfig) -> str:
-        # TODO: real API call goes here
-        return (
-            f"[simulated {self.name}:{config.provider_model}] "
-            f"response to: {request.query[:150]}"
+        return self._call_api(request, config)
+
+    def _call_api(self, request: QueryRequest, config: ModelConfig) -> str:
+        raise NotImplementedError
+
+
+class OpenAICompatibleProvider(_ExternalKeyedProvider):
+    base_url: str
+
+    def _call_api(self, request: QueryRequest, config: ModelConfig) -> str:
+        response = httpx.post(
+            f"{self.base_url}/chat/completions",
+            headers={"Authorization": f"Bearer {os.environ[self.key_env]}"},
+            json={
+                "model": config.provider_model,
+                "messages": [{"role": "user", "content": request.query}],
+                "max_tokens": min(request.max_tokens or 512, config.max_tokens),
+                "temperature": request.temperature,
+            },
+            timeout=30,
         )
+        response.raise_for_status()
+        return response.json()["choices"][0]["message"]["content"]
 
 
-class OpenAIProvider(_ExternalKeyedProvider):
+class OpenAIProvider(OpenAICompatibleProvider):
     name = "openai"
     key_env = "OPENAI_API_KEY"
+    base_url = "https://api.openai.com/v1"
+
+
+class DeepSeekProvider(OpenAICompatibleProvider):
+    name = "deepseek"
+    key_env = "DEEPSEEK_API_KEY"
+    base_url = "https://api.deepseek.com"
 
 
 class AnthropicProvider(_ExternalKeyedProvider):
     name = "anthropic"
     key_env = "ANTHROPIC_API_KEY"
+
+    def _call_api(self, request: QueryRequest, config: ModelConfig) -> str:
+        response = httpx.post(
+            "https://api.anthropic.com/v1/messages",
+            headers={
+                "x-api-key": os.environ[self.key_env],
+                "anthropic-version": "2023-06-01",
+            },
+            json={
+                "model": config.provider_model,
+                "max_tokens": min(request.max_tokens or 512, config.max_tokens),
+                "messages": [{"role": "user", "content": request.query}],
+            },
+            timeout=30,
+        )
+        response.raise_for_status()
+        blocks = response.json().get("content", [])
+        return "".join(b.get("text", "") for b in blocks if b.get("type") == "text")
+
+
+class ResponseCache:
+    """LRU + TTL cache for successful inference results."""
+
+    def __init__(self, max_entries: int = CACHE_MAX_ENTRIES, ttl_seconds: int = CACHE_TTL_SECONDS):
+        self._store: "OrderedDict[str, Tuple[float, dict]]" = OrderedDict()
+        self._lock = threading.Lock()
+        self.max_entries = max_entries
+        self.ttl_seconds = ttl_seconds
+        self.hits = 0
+        self.misses = 0
+
+    def get(self, key: str) -> Optional[dict]:
+        with self._lock:
+            entry = self._store.get(key)
+            if entry is None:
+                self.misses += 1
+                return None
+            stored_at, payload = entry
+            if time.time() - stored_at > self.ttl_seconds:
+                del self._store[key]
+                self.misses += 1
+                return None
+            self._store.move_to_end(key)
+            self.hits += 1
+            return dict(payload)
+
+    def put(self, key: str, payload: dict) -> None:
+        with self._lock:
+            self._store[key] = (time.time(), payload)
+            self._store.move_to_end(key)
+            while len(self._store) > self.max_entries:
+                self._store.popitem(last=False)
+
+    def stats(self) -> dict:
+        with self._lock:
+            total = self.hits + self.misses
+            return {
+                "entries": len(self._store),
+                "hits": self.hits,
+                "misses": self.misses,
+                "hit_rate": round(self.hits / total, 4) if total else 0.0,
+            }
 
 
 class AllModelsFailedError(Exception):
@@ -87,10 +187,25 @@ class InferenceEngine:
     def __init__(self, config: RouterConfig):
         self._config = config
         self._providers: Dict[str, BaseProvider] = {
-            p.name: p for p in (LocalProvider(), OpenAIProvider(), AnthropicProvider())
+            p.name: p
+            for p in (LocalProvider(), OpenAIProvider(), AnthropicProvider(), DeepSeekProvider())
         }
+        self._cache = ResponseCache()
+
+    def cache_stats(self) -> dict:
+        return self._cache.stats()
+
+    @staticmethod
+    def _cache_key(request: QueryRequest, model_name: str) -> str:
+        return f"{model_name}|{request.user_tier}|{request.max_tokens}|{request.query}"
 
     def run(self, request: QueryRequest, decision: RoutingDecision) -> InferenceResult:
+        cache_key = self._cache_key(request, decision.selected_model)
+        hit = self._cache.get(cache_key)
+        if hit is not None:
+            hit.update({"cached": True, "latency_ms": 0})
+            return InferenceResult.model_validate(hit)
+
         chain = [decision.selected_model] + decision.fallback_models
         attempted: List[str] = []
         errors: Dict[str, str] = {}
@@ -123,7 +238,7 @@ class InferenceEngine:
                 8,
             )
             fallback_used = model_name != decision.selected_model
-            return InferenceResult(
+            result = InferenceResult(
                 response_text=response_text,
                 model_name=model_name,
                 provider=model_config.provider,
@@ -141,6 +256,9 @@ class InferenceEngine:
                 attempted_models=attempted,
                 provider_errors=errors,
             )
+            if not fallback_used:
+                self._cache.put(cache_key, result.model_dump())
+            return result
 
         raise AllModelsFailedError(attempted, errors)
 

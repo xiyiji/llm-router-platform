@@ -94,13 +94,15 @@ def test_premium_user_selects_higher_priority_model():
     assert config.router.models[decision.selected_model].priority > local_max_priority
 
 
-def test_free_user_never_gets_external_models(no_external_keys):
+def test_free_user_never_gets_premium_providers(no_external_keys):
     config = load_config()
     router = QueryRouter(config.router)
     decision = router.route(
         QueryRequest(query="analyze tradeoffs of caching vs compression", user_tier="free")
     )
-    assert decision.selected_model in LOCAL_MODELS
+    # deepseek-chat is cheap enough for the free tier; gpt/claude are not
+    assert decision.selected_model in LOCAL_MODELS | {"deepseek-chat"}
+    assert decision.selected_model not in EXTERNAL_MODELS
 
 
 # -- fallback behavior ------------------------------------------------------
@@ -124,9 +126,15 @@ def test_missing_keys_trigger_fallback_not_500(no_external_keys):
     assert body["routing"]["provider_errors"]
 
 
-def test_simulated_external_provider_used_when_key_present(monkeypatch):
+def test_external_provider_used_when_key_present(monkeypatch):
+    from inference import OpenAICompatibleProvider
+
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    monkeypatch.setattr(
+        OpenAICompatibleProvider, "_call_api",
+        lambda self, request, config: f"stubbed {self.name} answer", raising=True,
+    )
     response = client.post(
         "/route",
         json={
@@ -214,3 +222,26 @@ def test_logs_endpoint_records_requests(no_external_keys):
     body = client.get("/logs").json()
     assert body["logs"]
     assert any("->" in entry["message"] for entry in body["logs"])
+
+
+# -- real response cache ----------------------------------------------------
+
+def test_identical_request_hits_cache(no_external_keys):
+    payload = {"query": "what is a totally unique cache probe question?", "user_id": "c1", "user_tier": "free"}
+    first = client.post("/route", json=payload).json()
+    second = client.post("/route", json=payload).json()
+    assert first["cached"] is False
+    assert second["cached"] is True
+    assert second["latency_ms"] == 0
+    assert second["response"] == first["response"]
+
+
+def test_cache_stats_exposed_in_status():
+    body = client.get("/status").json()
+    assert "cache" in body and "hit_rate" in body["cache"]
+
+
+def test_deepseek_adapter_listed(no_external_keys):
+    providers = client.get("/health").json()["services"]["inference"]["details"]["providers"]
+    assert "deepseek" in providers
+    assert providers["deepseek"]["healthy"] is False

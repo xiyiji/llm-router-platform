@@ -63,6 +63,7 @@ def status() -> dict:
             },
         },
         "adapters": _engine.details()["providers"],
+        "cache": _engine.cache_stats(),
         "optimization": {"enabled": False},
     }
 

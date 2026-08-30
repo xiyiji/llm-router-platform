@@ -74,10 +74,12 @@ which makes provider outages debuggable from the response body alone.
 **Provider abstraction.** `local`, `openai` and `anthropic` providers share a
 `BaseProvider` interface with a separate availability check (external
 providers gate on their API key env var). All of them emit one unified
-`InferenceResult`, so the API and routing layers are provider-agnostic; a real
-SDK call drops into `_generate_text` without touching anything upstream.
-External calls are currently stubbed, which keeps the demo free to run and
-leak-proof.
+`InferenceResult`, so the API and routing layers are provider-agnostic. In
+phase 3 the external providers (`openai`, `anthropic`, `deepseek`) make real
+API calls when their key env var is set; without keys they report unavailable
+and requests degrade to the local models, so the service runs free and
+leak-proof by default. DeepSeek is cheap enough that the free tier is allowed
+to route to it.
 
 **Observability without a database.** Phase 3 records every routed request
 into a lock-guarded in-memory store and aggregates on read: per-model /
@@ -87,6 +89,11 @@ series, P95 latency (nearest-rank), hotspot models, and SLO evaluation
 high-fallback-ratio warning that in practice means "your API keys are
 missing". Logs sit in a fixed-size ring buffer. Aggregation is O(n) over a
 snapshot taken under the lock, so readers never block writers for long.
+
+**Response caching.** Successful non-fallback inference results go through
+an LRU+TTL cache keyed on (model, tier, max_tokens, query); the `cached` flag
+and the hit/miss counters on `/status` are real, and temperature-0 requests
+make repeats genuine hits.
 
 **A frontend that refuses to lie.** The Streamlit dashboard (Overview,
 Models, Performance, Users, Costs, Alerts, Logs) renders only what the
@@ -138,13 +145,26 @@ folder), covering the contract (validation, stable response shape), behavior
 (fallback instead of 500s, broken rules skipped) and the phase 3 aggregation
 endpoints. The rule-engine security tests are the ones worth reading first.
 
+## Benchmarks
+
+`scripts/load_test.py` against `POST /route` on a single uvicorn worker
+(M-series MacBook, rules path, unique queries so the cache does not help):
+
+| concurrency | requests | RPS | P50 | P95 | P99 | errors |
+|---|---|---|---|---|---|---|
+| 10 | 1000 | 831 | 7 ms | 31 ms | 82 ms | 0 |
+| 50 | 2000 | 435 | 69 ms | 317 ms | 495 ms | 0 |
+
+The gap between the two rows is queueing on one worker, not work per request;
+scaling out means more workers plus a shared metrics store.
+
 ## Known limits
 
 Metrics are in-memory and reset on restart; multi-worker deployments would
-need a shared store (Redis/Postgres) behind `MetricsStore`. External provider
-calls are stubbed pending real SDK integration. `cached` is always false, the
-field exists as a contract placeholder. `/route` trusts the caller's
-`user_tier`, so real deployments need authentication in front.
+need a shared store (Redis/Postgres) behind `MetricsStore`. Real provider
+calls exist in phase 3 only (`Two/` keeps the phase 2 stubs as a snapshot)
+and need API keys to activate. `/route` trusts the caller's `user_tier`, so
+real deployments need authentication in front.
 
 Deployment notes: see `DEPLOY.md` (Render for the API, Streamlit Community
 Cloud for the dashboard).

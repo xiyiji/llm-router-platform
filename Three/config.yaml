@@ -68,6 +68,20 @@ router:
       avg_latency_ms: 1200
       success_rate: 0.98
 
+    deepseek-chat:
+      provider: "deepseek"
+      provider_model: "deepseek-chat"
+      max_tokens: 8192
+      cost_per_1k_input: 0.00027
+      cost_per_1k_output: 0.0011
+      priority: 3
+      capabilities: [general, chat, coding, analysis, reasoning]
+      supported_tiers: [free, premium, enterprise]
+      fallback_model: "local-general"
+      api_key_env: "DEEPSEEK_API_KEY"
+      avg_latency_ms: 1500
+      success_rate: 0.98
+
   routing_rules:
     - name: "coding_rule"
       condition: "query_type == 'coding'"
