@@ -6,7 +6,7 @@ A three-phase course project building an LLM routing and execution platform.
 |-------|-----------|--------|-------|
 | 1 | [`One/`](One/) | ✅ Done | Minimal `API -> Router -> Inference` pipeline (FastAPI, mock provider, port 8081) |
 | 2 | [`Two/`](Two/) | ✅ Done | Intelligent routing, multi-provider abstraction, fallback/degradation (port 8082) |
-| 3 | — | Pending | Observability endpoints + Streamlit dashboard |
+| 3 | [`Three/`](Three/) | ✅ Done | Observability endpoints (`/status`, `/analytics`, `/quality/dashboard`, `/feedback`, `/logs`) + Streamlit dashboard (API :8080, UI :8501) |
 
 Specs (in Chinese) live in [`project2/project2/`](project2/project2/) — `Phase 1.md` through `Phase 3.md`.
 
