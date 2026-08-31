@@ -158,13 +158,12 @@ endpoints. The rule-engine security tests are the ones worth reading first.
 The gap between the two rows is queueing on one worker, not work per request;
 scaling out means more workers plus a shared metrics store.
 
-## Known limits
-
-Metrics are in-memory and reset on restart; multi-worker deployments would
-need a shared store (Redis/Postgres) behind `MetricsStore`. Real provider
-calls exist in phase 3 only (`Two/` keeps the phase 2 stubs as a snapshot)
-and need API keys to activate. `/route` trusts the caller's `user_tier`, so
-real deployments need authentication in front.
 
 Deployment notes: see `DEPLOY.md` (Render for the API, Streamlit Community
 Cloud for the dashboard).
+
+This platform is the first of three related projects: its routing idea was
+applied to a real logistics workflow in
+[llm-project](https://github.com/xiyiji/llm-project) and then evolved into a
+learned, PPO-optimized routing policy in
+[llm-gateway](https://github.com/xiyiji/llm-gateway).
