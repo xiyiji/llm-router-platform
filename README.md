@@ -162,8 +162,3 @@ scaling out means more workers plus a shared metrics store.
 Deployment notes: see `DEPLOY.md` (Render for the API, Streamlit Community
 Cloud for the dashboard).
 
-This platform is the first of three related projects: its routing idea was
-applied to a real logistics workflow in
-[llm-project](https://github.com/xiyiji/llm-project) and then evolved into a
-learned, PPO-optimized routing policy in
-[llm-gateway](https://github.com/xiyiji/llm-gateway).
